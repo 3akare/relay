@@ -6,12 +6,12 @@ from pathlib import Path
 try:
     from utils import run_command
     from constants import MANIFEST_FILE
-    from templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE
+    from templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE, CLANG_FORMAT_TEMPLATE
     from helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json
 except ModuleNotFoundError:
     from relay.utils import run_command
     from relay.constants import MANIFEST_FILE
-    from relay.templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE
+    from relay.templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE, CLANG_FORMAT_TEMPLATE
     from relay.helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json
 except Exception:
     pass
@@ -49,10 +49,15 @@ def run_new(args):
         (project_path / "CmakeLists.txt").write_text(cmakelist_content)
         verbose and print(f"Created CmakeLists.txt")
 
+        # .clang-format
+        (project_path / ".clang-format").write_text(CLANG_FORMAT_TEMPLATE)
+        verbose and print(f"Created .clang-format")
+        
         # Relay.toml (mainfest file)
         relay_toml_content = RELAY_TOML_TEMPLATE.format(project_name=project_name)
         (project_path / MANIFEST_FILE).write_text(relay_toml_content)
         verbose and print(f"Created {MANIFEST_FILE}")
+
 
         print(f"\nSuccessfully created project '{project_name}'.")
         print(f"Next steps:")
