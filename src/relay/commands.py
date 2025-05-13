@@ -4,6 +4,8 @@ from constants import MANIFEST_FILE
 from templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE
 from helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json
 import sys
+import toml
+import platform
 
 
 def run_new(args):
@@ -111,4 +113,44 @@ def run_build(args):
     print("Build successful!")
 
 def run_run(args):
-    print("run")
+    verbose = args.verbose
+    verbose and print(f"Running project...")
+
+    project_root = find_project_root(verbose)
+    
+    # build binary
+    if not project_root:
+        run_build(args)
+
+    triplet = get_vcpkg_triplet(args.toolchain, verbose)
+    build_dir = get_build_dir(project_root, triplet)
+    relay_toml_path = project_root / MANIFEST_FILE
+
+    try:
+        with open(relay_toml_path, 'r') as f:
+            relay_config = toml.load(f)
+        project_name = relay_config.get("project", {}).get("name", project_root.name)
+        executable_name = relay_config.get("project", {}).get("main_executable", project_name)
+    except FileNotFoundError:
+        print(f"Error: Manifest file '{relay_toml_path}' not found.", file=sys.stderr)
+        sys.exit(1)
+    except toml.TomlDecodeError as e:
+        print(f"Error: Could not parse '{relay_toml_path}': {e}", file=sys.stderr)
+        sys.exit(1)
+    except Exception as e:
+         print(f"An unexpected error occurred while reading project name from {MANIFEST_FILE}: {e}", file=sys.stderr)
+         sys.exit(1)
+
+    # file extension
+    exe_extension = ".exe" if platform.system() == "Windows" else ""
+    executable_path = build_dir / f"{executable_name}{exe_extension}"
+
+    # Check if the executable exists
+    if not executable_path.exists():
+        print(f"Error: Executable not found at expected path: {executable_path}", file=sys.stderr)
+        print("Please ensure the project built successfully and check your CMakeLists.txt for the executable target name.", file=sys.stderr)
+        sys.exit(1)
+
+    if not run_command(command=[str(executable_path)], cwd=build_dir, verbose=verbose):
+        print("\nProject run failed.", file=sys.stderr)
+        sys.exit(1)

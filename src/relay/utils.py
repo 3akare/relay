@@ -16,7 +16,7 @@ def run_command(command, cwd=None, verbose=None):
         )
         if result.stdout:
             verbose and print("--- RELAY OUTPUT ---")
-            verbose and print(result.stdout)
+            print(result.stdout, end="")
             verbose and print("--------------------")
         if result.stderr:
             print("--- RELAY ERROR ---", file=sys.stderr)

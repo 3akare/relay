@@ -1,1 +1,0 @@
-print("Relay is live")
