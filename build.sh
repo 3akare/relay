@@ -1,0 +1,1 @@
+pyinstaller --onedir src/relay/relay.py --clean --add-data "src/relay:relay" --hidden-import toml --hidden-import json --hidden-import platform

@@ -1,9 +1,16 @@
-from pathlib import Path
-from constants import MANIFEST_FILE, VCPKG_MANIFEST_FILE
 import os
 import sys
 import toml;
 import json
+from pathlib import Path
+
+try:
+    from constants import MANIFEST_FILE, VCPKG_MANIFEST_FILE
+except ModuleNotFoundError:
+    from relay.constants import MANIFEST_FILE, VCPKG_MANIFEST_FILE
+except Exception:
+    pass
+
 
 def find_project_root(verbose):
     current_dir = Path.cwd()

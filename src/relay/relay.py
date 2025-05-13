@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
-from constants import RELAY_VERSION
-from commands import run_new, run_build, run_run
+
 import argparse
+try:
+    from relay.constants import RELAY_VERSION
+    from relay.commands import run_new, run_build, run_run
+except ModuleNotFoundError:
+    from constants import RELAY_VERSION
+    from commands import run_new, run_build, run_run
+except Exception:
+    pass
 
 def main():
     parser = argparse.ArgumentParser(

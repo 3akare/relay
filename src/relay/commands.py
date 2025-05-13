@@ -1,12 +1,20 @@
-from pathlib import Path
-from utils import run_command
-from constants import MANIFEST_FILE
-from templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE
-from helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json
 import sys
 import toml
 import platform
+from pathlib import Path
 
+try:
+    from utils import run_command
+    from constants import MANIFEST_FILE
+    from templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE
+    from helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json
+except ModuleNotFoundError:
+    from relay.utils import run_command
+    from relay.constants import MANIFEST_FILE
+    from relay.templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE
+    from relay.helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json
+except Exception:
+    pass
 
 def run_new(args):
     verbose = args.verbose
