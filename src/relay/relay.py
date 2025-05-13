@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import argparse
 try:
     from relay.constants import RELAY_VERSION
