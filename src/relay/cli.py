@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
+from constants import RELAY_VERSION
 from commands import run_new, run_build, run_run
 import argparse
-
-# consts
-RELAY_VERSION = "0.1.0"
 
 def main():
     parser = argparse.ArgumentParser(
@@ -23,6 +21,13 @@ def main():
     parser.add_argument(
         "--toolchain",
         help="Specify the build toolchain triplet (e.g., x64-windows, x64-linux). Defaults to VCPKG_DEFAULT_TRIPLET environment variable or guesses based on OS."
+    )
+
+    # verbose
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Use verbose output"
     )
 
     # COMMANDS
