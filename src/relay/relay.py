@@ -2,10 +2,10 @@
 import argparse
 try:
     from relay.constants import RELAY_VERSION
-    from relay.commands import run_new, run_build, run_run, run_clean, run_install, run_update, run_remove
+    from relay.commands import run_new, run_build, run_run, run_clean, run_install_command, run_update, run_remove, add_dependency_to_manifest
 except ModuleNotFoundError:
     from constants import RELAY_VERSION
-    from commands import run_new, run_build, run_run, run_clean, run_install, run_update, run_remove
+    from commands import run_new, run_build, run_run, run_clean, run_install_command, run_update, run_remove, add_dependency_to_manifest
 except Exception:
     pass
 
@@ -72,13 +72,20 @@ def main():
     install_parser = subparsers.add_parser(
         "install",
         aliases=["i"],
-        help="Install new dependency"
+        help="Install dependencies listed in Relay.toml via vcpkg"
     )
-    install_parser.add_argument(
+    install_parser.set_defaults(func=run_install_command)
+
+    # add
+    add_parser = subparsers.add_parser(
+        "add",
+        help="Name of the dependency to add (e.g., 'fmt', 'zlib')"
+    )
+    add_parser.add_argument(
         "dependency_name",
         help="Name of the dependency to install"
     )
-    install_parser.set_defaults(func=run_install)
+    add_parser.set_defaults(func=add_dependency_to_manifest)
 
     # remove
     remove_parser = subparsers.add_parser(

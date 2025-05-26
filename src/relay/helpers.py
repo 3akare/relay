@@ -112,3 +112,49 @@ def generate_vcpkg_json(project_root, build_dir, verbose):
     except Exception as e:
          print(f"An unexpected error occurred during {VCPKG_MANIFEST_FILE} generation: {e}", file=sys.stderr)
          sys.exit(1)
+
+def generate_vcpkg_json_from_relay_toml(project_root: Path):
+    relay_toml_path = project_root / MANIFEST_FILE
+    vcpkg_json_path = project_root / VCPKG_MANIFEST_FILE
+
+    if not relay_toml_path.exists():
+        print(f"Error: {MANIFEST_FILE} not found at {relay_toml_path}.")
+        return False
+
+    try:
+        with open(relay_toml_path, 'r') as f:
+            relay_config = toml.load(f)
+    except (FileNotFoundError, toml.TomlDecodeError) as e:
+        print(f"Error reading {MANIFEST_FILE}: {e}")
+        return False
+    
+    dependencies = relay_config.get("dependencies", {})
+    vcpkg_dependencies_list = []
+    for dep_name, dep_version in dependencies.items():
+        vcpkg_dependencies_list.append(dep_name)
+
+    # Basic vcpkg.json structure
+    vcpkg_json_content = {
+        "dependencies": sorted(vcpkg_dependencies_list) # Sort for consistent file output
+    }
+    
+    if vcpkg_json_path.exists():
+        try:
+            with open(vcpkg_json_path, 'r') as f:
+                existing_vcpkg_config = json.load(f)
+            if "builtin-baseline" in existing_vcpkg_config:
+                vcpkg_json_content["builtin-baseline"] = existing_vcpkg_config["builtin-baseline"]
+            if "name" in existing_vcpkg_config:
+                vcpkg_json_content["name"] = existing_vcpkg_config["name"]
+        except json.JSONDecodeError:
+            print(f"Warning: Existing {VCPKG_MANIFEST_FILE} is malformed. Creating new one.")
+        except Exception as e:
+            print(f"Warning: Could not read existing {VCPKG_MANIFEST_FILE} for baseline: {e}")
+    try:
+        with open(vcpkg_json_path, 'w') as f:
+            json.dump(vcpkg_json_content, f, indent=4)
+        print(f"Generated/Updated {VCPKG_MANIFEST_FILE} based on {MANIFEST_FILE}.")
+        return True
+    except IOError as e:
+        print(f"Error writing to {VCPKG_MANIFEST_FILE}: {e}")
+        return False
