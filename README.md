@@ -10,7 +10,7 @@ Relay offers two main installation methods: downloading pre-built binaries (reco
 
 ### Option 1: Install with Pre-built Binaries (Recommended)
 Download the appropriate pre-built executable for your operating system:
-* **For macOS (x64):**
+* **For macOS/Linux (x64):**
     ```bash
     curl -LJO https://github.com/3akare/relay/releases/latest/download/relay-macos-x64.zip && \
     unzip -o relay-macos-x64.zip && \
@@ -18,16 +18,6 @@ Download the appropriate pre-built executable for your operating system:
     sudo mv relay /opt/relay && \
     sudo ln -sf /opt/relay/relay /usr/local/bin/relay && \
     rm relay-macos-x64.zip && \
-    echo "Relay installed! Try: relay --version"
-    ```
-* **For Linux (x64):**
-    ```bash
-    curl -LJO https://github.com/3akare/relay/releases/latest/download/relay-linux-x64.zip && \
-    unzip relay-linux-x64.zip && \
-    sudo mkdir -p /opt && \
-    sudo mv relay /opt/relay && \
-    sudo ln -sf /opt/relay/relay /usr/local/bin/relay && \
-    rm relay-linux-x64.zip && \
     echo "Relay installed! Try: relay --version"
     ```
 ---
