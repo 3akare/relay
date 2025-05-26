@@ -5,12 +5,12 @@ from pathlib import Path
 
 try:
     from utils import run_command
-    from constants import MANIFEST_FILE
+    from constants import MANIFEST_FILE, RELAY_VERSION
     from templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE, CLANG_FORMAT_TEMPLATE
     from helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json
 except ModuleNotFoundError:
     from relay.utils import run_command
-    from relay.constants import MANIFEST_FILE
+    from relay.constants import MANIFEST_FILE, RELAY_VERSION
     from relay.templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE, CLANG_FORMAT_TEMPLATE
     from relay.helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json
 except Exception:
@@ -167,3 +167,28 @@ def run_run(args):
     if not run_command(command=[str(executable_path)], cwd=build_dir, verbose=verbose):
         print("\nProject run failed.", file=sys.stderr)
         sys.exit(1)
+
+def run_install(args):
+     print(f"Installing dependency: {args.dependency_name} with version {RELAY_VERSION}")
+
+def run_remove(args):
+    print(f"Deleting dependency: {args.dependency_name}")
+
+def run_update(args):
+     print("Updating dependencies...")
+
+def run_clean(args):
+    verbose = args.verbose
+    toolchain = args.toolchain
+    print("Cleaning build artifacts...")
+
+    # Remove the 'build' directory at the project root
+    project_root = find_project_root(verbose)
+    triplet = get_vcpkg_triplet(toolchain, verbose)
+    build_dir = get_build_dir(project_root, triplet=triplet)
+    if build_dir.exists():
+        print(f"Removing build directory: {build_dir}")
+        import shutil
+        shutil.rmtree(Path(build_dir).parent)
+    else:
+        print("No build directory found to clean.")

@@ -2,10 +2,10 @@
 import argparse
 try:
     from relay.constants import RELAY_VERSION
-    from relay.commands import run_new, run_build, run_run
+    from relay.commands import run_new, run_build, run_run, run_clean, run_install, run_update, run_remove
 except ModuleNotFoundError:
     from constants import RELAY_VERSION
-    from commands import run_new, run_build, run_run
+    from commands import run_new, run_build, run_run, run_clean, run_install, run_update, run_remove
 except Exception:
     pass
 
@@ -68,7 +68,47 @@ def main():
     )
     run_parser.set_defaults(func=run_run)
 
-    # TODO: clean, add, remove, update
+    # install
+    install_parser = subparsers.add_parser(
+        "install",
+        aliases=["i"],
+        help="Install new dependency"
+    )
+    install_parser.add_argument(
+        "dependency_name",
+        help="Name of the dependency to install"
+    )
+    install_parser.set_defaults(func=run_install)
+
+    # remove
+    remove_parser = subparsers.add_parser(
+        "remove",
+        aliases=["rm"],
+        help="Remove a dependency from the project"
+    )
+    remove_parser.add_argument(
+        "dependency_name",
+        help="Name of the dependency to remove"
+    )
+    remove_parser.set_defaults(func=run_remove)
+
+    # update
+    update_parser = subparsers.add_parser(
+        "update",
+        help="Update project dependencies"
+    )
+    update_parser.add_argument(
+        "dependency_name",
+        help="Name of the dependency to update"
+    )
+    update_parser.set_defaults(func=run_update)
+
+     # clean
+    clean_parser = subparsers.add_parser(
+        "clean",
+        help="Remove build artifacts and cached files"
+    )
+    clean_parser.set_defaults(func=run_clean)
 
     args = parser.parse_args()
     if (hasattr(args, 'func')):
