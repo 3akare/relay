@@ -65,3 +65,9 @@ UseTab: Never
 IndentWidth: 4
 TabWidth: 2
 """
+
+# .gitignore content
+GITIGNORE = """\
+build/
+vcpkg_installed/
+"""

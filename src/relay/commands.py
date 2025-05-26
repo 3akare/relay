@@ -52,6 +52,12 @@ def run_new(args):
         # .clang-format
         (project_path / ".clang-format").write_text(CLANG_FORMAT_TEMPLATE)
         verbose and print(f"Created .clang-format")
+
+        # .gitignore
+        (project_path / ".gitignore").write_text(GITIGNORE)
+        git_init_command = ["git", "init", str(project_path)]
+        run_command(git_init_command, verbose=verbose)
+        verbose and print(f"Created .gitignore")
         
         # Relay.toml (mainfest file)
         relay_toml_content = RELAY_TOML_TEMPLATE.format(project_name=project_name)
