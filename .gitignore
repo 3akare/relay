@@ -3,3 +3,4 @@ venv/
 dist/
 build/
 *.spec
+.DS_Store
