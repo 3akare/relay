@@ -1,6 +1,5 @@
 import sys
 import toml
-import json
 import platform
 from pathlib import Path
 
@@ -8,12 +7,12 @@ try:
     from utils import run_command
     from constants import MANIFEST_FILE, RELAY_VERSION, VCPKG_MANIFEST_FILE
     from templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE, CLANG_FORMAT_TEMPLATE, GITIGNORE
-    from helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json, generate_vcpkg_json_from_relay_toml
+    from helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json, generate_vcpkg_json_from_relay_toml, update_cmake_lists_txt
 except ModuleNotFoundError:
     from relay.utils import run_command
     from relay.constants import MANIFEST_FILE, RELAY_VERSION, VCPKG_MANIFEST_FILE
     from relay.templates import MAIN_C_TEMPLATE, MAIN_H_TEMPLATE, CMAKELISTS_TEMPLATE, RELAY_TOML_TEMPLATE, CLANG_FORMAT_TEMPLATE, GITIGNORE
-    from relay.helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json, generate_vcpkg_json_from_relay_toml
+    from relay.helpers import find_project_root, find_vcpkg_root, get_vcpkg_triplet, get_build_dir, generate_vcpkg_json, generate_vcpkg_json_from_relay_toml, update_cmake_lists_txt
 except Exception:
     pass
 
@@ -22,52 +21,43 @@ def run_new(args):
     project_name = args.project_name
     project_path = Path(project_name)
 
-    # Ensure directory doesn't exist
-    if (project_path.exists()):
+    if project_path.exists():
         print(f"Error: Directory '{project_name}' already exists", file=sys.stderr)
         sys.exit(1)
     print(f"Creating binary (application) `{project_name}` package...")
 
-    # Create sub-directories
     try:
         project_path.mkdir()
         (project_path / "src").mkdir()
         (project_path / "include").mkdir()
 
-        # main.c
         main_c_content = MAIN_C_TEMPLATE.format(project_name=project_name)
         (project_path / "src" / "main.c").write_text(main_c_content)
         verbose and print("Created src/main.c")
 
-        # main.h
         include_guard = f"{project_name.upper().replace('-', '_').replace('.', '_')}_H"
         main_h_content = MAIN_H_TEMPLATE.format(include_guard=include_guard)
         (project_path / "include" / f"{project_name}.h").write_text(main_h_content)
         verbose and print(f"Created include/{project_name}.h")
 
-        # CmakeLists.txt
         cmakelist_content = CMAKELISTS_TEMPLATE.format(project_name=project_name)
         (project_path / "CmakeLists.txt").write_text(cmakelist_content)
-        verbose and print(f"Created CmakeLists.txt")
+        verbose and print("Created CmakeLists.txt")
 
-        # .clang-format
         (project_path / ".clang-format").write_text(CLANG_FORMAT_TEMPLATE)
-        verbose and print(f"Created .clang-format")
+        verbose and print("Created .clang-format")
 
-        # .gitignore
         (project_path / ".gitignore").write_text(GITIGNORE)
         git_init_command = ["git", "init", str(project_path)]
         run_command(git_init_command, verbose=verbose)
-        verbose and print(f"Created .gitignore")
+        verbose and print("Created .gitignore")
         
-        # Relay.toml (mainfest file)
         relay_toml_content = RELAY_TOML_TEMPLATE.format(project_name=project_name)
         (project_path / MANIFEST_FILE).write_text(relay_toml_content)
         verbose and print(f"Created {MANIFEST_FILE}")
 
-
         print(f"\nSuccessfully created project '{project_name}'.")
-        print(f"Next steps:")
+        print("Next steps:")
         print(f"  cd {project_name}")
         print(f"  # Add dependencies to {MANIFEST_FILE} (e.g., under [dependencies])")
         print(f"  # Update CMakeLists.txt to find and link added dependencies")
@@ -75,23 +65,23 @@ def run_new(args):
         print(f"  relay [--toolchain <triplet>] build")
 
     except OSError as e:
-        print(f"Error creating project directories or files: {e}")
+        print(f"Error creating project directories or files: {e}", file=sys.stderr)
         sys.exit(1)
     except Exception as e:
-        print(f"An unexpected error occured: {e}")
+        print(f"An unexpected error occured: {e}", file=sys.stderr)
         sys.exit(1)
 
 def run_build(args):
     verbose = args.verbose
     toolchain = args.toolchain
 
-    print(f"Building project...")
+    print("Building project...")
     project_root = find_project_root(verbose)
     vcpkg_root = find_vcpkg_root(verbose)
 
     vcpkg_toolchain_file = vcpkg_root / "scripts" / "buildsystems" / "vcpkg.cmake"
     if not vcpkg_toolchain_file.exists():
-         vcpkg_toolchain_file = vcpkg_root / "share" / "vcpkg" / "vcpkg.cmake" # Check Homebrew path
+         vcpkg_toolchain_file = vcpkg_root / "share" / "vcpkg" / "vcpkg.cmake"
          if not vcpkg_toolchain_file.exists():
             print(f"Error: vcpkg toolchain file not found at expected locations relative to VCPKG_ROOT: {vcpkg_root}", file=sys.stderr)
             print("Looked for:",
@@ -108,7 +98,6 @@ def run_build(args):
 
     generate_vcpkg_json(project_root, build_dir, verbose)
 
-    # CMake configure
     verbose and print("\n--- Configuring CMake ---")
     cmake_configure_command = [
         "cmake",
@@ -121,7 +110,6 @@ def run_build(args):
         print("\nCMake configuration failed.", file=sys.stderr)
         sys.exit(1)
 
-    # CMake build
     verbose and print("\n--- Building Project ---")
     cmake_build_command = [
         "cmake",
@@ -134,11 +122,10 @@ def run_build(args):
 
 def run_run(args):
     verbose = args.verbose
-    verbose and print(f"Running project...")
+    verbose and print("Running project...")
 
     project_root = find_project_root(verbose)
     
-    # build binary
     if not project_root:
         run_build(args)
 
@@ -161,11 +148,9 @@ def run_run(args):
          print(f"An unexpected error occurred while reading project name from {MANIFEST_FILE}: {e}", file=sys.stderr)
          sys.exit(1)
 
-    # file extension
     exe_extension = ".exe" if platform.system() == "Windows" else ""
     executable_path = build_dir / f"{executable_name}{exe_extension}"
 
-    # Check if the executable exists
     if not executable_path.exists():
         print(f"Error: Executable not found at expected path: {executable_path}", file=sys.stderr)
         print("Please ensure the project built successfully and check your CMakeLists.txt for the executable target name.", file=sys.stderr)
@@ -211,23 +196,24 @@ def run_install_command(args):
 
     result = run_command(vcpkg_command, cwd=project_root)
 
-    if result == True:
+    if result:
         print("\nDependencies installed successfully via vcpkg.")
+        print("Attempting to update CMakeLists.txt automatically...")
+        if update_cmake_lists_txt(project_root):
+            print("CMakeLists.txt updated successfully.")
+        else:
+            print("Failed to automatically update CMakeLists.txt. Please check for errors.")
+            print("You might need to manually add dependency calls to your CMakeLists.txt.")
     else:
-        print(f"\nError: Vcpkg install failed with exit code {result.returncode}.")
-        print("Vcpkg output:")
-        print(result.stdout)
-        if result.stderr:
-            print(result.stderr)
+        print(f"\nError: Vcpkg install failed with exit code {result}.", file=sys.stderr)
+        print("Vcpkg output:", file=sys.stderr)
+        print(result, file=sys.stderr)
         return 
-    # TODO: Update Cmakefile.txt... Be like say dev go dey do am by themselves
     print("\nDependency installation process complete.")
 
 def add_dependency_to_manifest(args):
     verbose = args.verbose
     dependency_name = args.dependency_name
-    dependency_version = None # Will be None if not specified
-
     print(f"\nAdding dependency '{dependency_name}' to {MANIFEST_FILE}...")
 
     project_root = find_project_root(verbose)
@@ -237,62 +223,145 @@ def add_dependency_to_manifest(args):
 
     relay_toml_path = project_root / MANIFEST_FILE
 
-    # Ensure Relay.toml exists, or create a minimal one if not
     if not relay_toml_path.exists():
         print(f"Warning: {MANIFEST_FILE} not found. Creating a minimal one.")
         try:
             with open(relay_toml_path, 'w') as f:
                 toml.dump({"project": {"name": project_root.name, "version": "0.1.0", "type": "executable"}}, f)
         except IOError as e:
-            print(f"Error creating {MANIFEST_FILE}: {e}")
+            print(f"Error creating {MANIFEST_FILE}: {e}", file=sys.stderr)
             return
 
-    # Read Relay.toml
     relay_config = {}
     try:
         with open(relay_toml_path, 'r') as f:
             relay_config = toml.load(f)
     except (FileNotFoundError, toml.TomlDecodeError) as e:
-        print(f"Error reading {MANIFEST_FILE}: {e}")
+        print(f"Error reading {MANIFEST_FILE}: {e}", file=sys.stderr)
         return
 
-    # Add dependency to [dependencies] table
     if "dependencies" not in relay_config:
         relay_config["dependencies"] = {}
 
     if dependency_name in relay_config["dependencies"]:
         print(f"Dependency '{dependency_name}' already exists in {MANIFEST_FILE}.")
     else:
-        # For simplicity, we add "*" for any compatible version from vcpkg
         relay_config["dependencies"][dependency_name] = "*"
         print(f"Added '{dependency_name}' to {MANIFEST_FILE}.")
 
-    # Write Relay.toml
     try:
         with open(relay_toml_path, 'w') as f:
             toml.dump(relay_config, f)
         print(f"Successfully updated {MANIFEST_FILE}.")
     except IOError as e:
-        print(f"Error writing to {MANIFEST_FILE}: {e}")
+        print(f"Error writing to {MANIFEST_FILE}: {e}", file=sys.stderr)
         return
 
-    # Now, generate vcpkg.json based on the updated Relay.toml
     if not generate_vcpkg_json_from_relay_toml(project_root):
-        print("Error: Failed to generate vcpkg.json after updating Relay.toml.")
+        print("Error: Failed to generate vcpkg.json after updating Relay.toml.", file=sys.stderr)
         return
     print(f"\nUse 'relay install' to download and build the dependencies.")
 
-def run_remove(args):
-    print(f"Deleting dependency: {args.dependency_name}")
+def run_remove_dependency(args):
+    dependency_name = args.dependency_name
+    verbose = args.verbose
+    verbose and print(f"\nAttempting to remove dependency: '{dependency_name}'...")
 
-def run_update(args):
-     print("Updating dependencies...")
+    project_root = find_project_root(verbose)
+    if not project_root:
+        print("Error: Could not find project root. Are you in a Relay project?")
+        return
+
+    relay_toml_path = project_root / MANIFEST_FILE
+    if not relay_toml_path.exists():
+        print(f"Error: {MANIFEST_FILE} not found at {relay_toml_path}. Cannot remove dependency.", file=sys.stderr)
+        return
+
+    relay_config = {}
+    try:
+        with open(relay_toml_path, 'r') as f:
+            relay_config = toml.load(f)
+    except (FileNotFoundError, toml.TomlDecodeError) as e:
+        print(f"Error reading {MANIFEST_FILE}: {e}", file=sys.stderr)
+        return
+
+    dependencies = relay_config.get("dependencies", {})
+    if dependency_name in dependencies:
+        del dependencies[dependency_name]
+        relay_config["dependencies"] = dependencies
+        print(f"Removed '{dependency_name}' from {MANIFEST_FILE}.")
+    else:
+        print(f"Dependency '{dependency_name}' not found in {MANIFEST_FILE}. Nothing to remove.")
+        return
+
+    try:
+        with open(relay_toml_path, 'w') as f:
+            toml.dump(relay_config, f)
+        print(f"Successfully updated {MANIFEST_FILE}.")
+    except IOError as e:
+        print(f"Error writing to {MANIFEST_FILE}: {e}", file=sys.stderr)
+        return
+
+    if not generate_vcpkg_json_from_relay_toml(project_root):
+        print("Error: Failed to regenerate vcpkg.json after removing dependency.", file=sys.stderr)
+        return
+
+    print("Updating CMakeLists.txt to reflect dependency changes...")
+    if update_cmake_lists_txt(project_root):
+        print("CMakeLists.txt updated successfully.")
+    else:
+        print("Failed to automatically update CMakeLists.txt. Please check for errors.", file=sys.stderr)
+        print("You might need to manually remove dependency calls from your CMakeLists.txt.", file=sys.stderr)
+
+    print("\nDependency removal process complete.")
+    print(f"Run 'relay install' to re-sync your vcpkg installations, then 'relay build' to rebuild your project.")
+    print(f"You might also want to run 'relay clean' before rebuilding.")
+
+def run_list_dependencies(args):
+    verbose = args.verbose
+    print("\nListing Project Dependencies...")
+    print("================================")
+
+    project_root = find_project_root(verbose)
+    if not project_root:
+        print("Error: Could not determine project root.", file=sys.stderr)
+        return
+
+    relay_toml_path = project_root / MANIFEST_FILE
+
+    if not relay_toml_path.exists():
+        print(f"Error: {MANIFEST_FILE} not found at {relay_toml_path}. Is this a Relay project?", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        with open(relay_toml_path, 'r') as f:
+            relay_config = toml.load(f)
+    except toml.TomlDecodeError as e:
+        print(f"Error: Could not parse {MANIFEST_FILE} at {relay_toml_path}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    dependencies = relay_config.get("dependencies")
+
+    if not dependencies:
+        print("No dependencies found in Relay.toml.")
+    elif not isinstance(dependencies, dict):
+        print(f"Warning: 'dependencies' section in {MANIFEST_FILE} is not a valid dictionary.", file=sys.stderr)
+        print("Please check your Relay.toml format.", file=sys.stderr)
+    else:
+        sorted_deps = sorted(dependencies.items())
+        for dep_name, dep_version in sorted_deps:
+            if dep_version == "*":
+                print(f"  {dep_name} (any compatible version)")
+            else:
+                print(f"  {dep_name} == {dep_version}")
+
+    print("\nDependency listing complete.")
 
 def run_clean(args):
     verbose = args.verbose
     toolchain = args.toolchain
     print("Cleaning build artifacts...")
-    # Remove the 'build' directory at the project root
+
     project_root = find_project_root(verbose)
     triplet = get_vcpkg_triplet(toolchain, verbose)
     build_dir = get_build_dir(project_root, triplet=triplet)
