@@ -1,4 +1,6 @@
 import argparse
+import sys
+
 try:
     from relay.constants import RELAY_VERSION
     from relay.commands import (
@@ -6,6 +8,7 @@ try:
         run_install_command, run_list_dependencies,
         run_remove_dependency, add_dependency_to_manifest
     )
+    from relay.colours import colored, CYAN, BOLD, RED 
 except ModuleNotFoundError:
     from constants import RELAY_VERSION
     from commands import (
@@ -13,18 +16,19 @@ except ModuleNotFoundError:
         run_install_command, run_list_dependencies,
         run_remove_dependency, add_dependency_to_manifest
     )
+    from colours import colored, CYAN, BOLD, RED
 except Exception:
     pass
 
 def main():
     parser = argparse.ArgumentParser(
-        description="C/C++ package manager",
+        description=colored("A C/C++ package manager", CYAN),
     )
 
     parser.add_argument(
         "--version", "-V",
         action="version",
-        version=f"relay {RELAY_VERSION}",
+        version=f"relay {colored(RELAY_VERSION, BOLD)}",
         help="Print version info and exit"
     )
     parser.add_argument(
@@ -75,11 +79,11 @@ def main():
 
     add_parser = subparsers.add_parser(
         "add",
-        help="Name of the dependency to add (e.g., 'fmt', 'zlib')"
+        help="Add a dependency to Relay.toml (e.g., 'fmt', 'zlib')"
     )
     add_parser.add_argument(
         "dependency_name",
-        help="Name of the dependency to install"
+        help="Name of the dependency to add"
     )
     add_parser.set_defaults(func=add_dependency_to_manifest)
 
@@ -112,6 +116,8 @@ def main():
         args.func(args)
     else:
         parser.print_help()
+        print(colored("\nError: No command specified.", RED), file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
