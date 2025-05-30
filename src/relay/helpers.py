@@ -1,23 +1,29 @@
 import os
 import sys
-import toml;
+import toml
 import json
+import platform
 from pathlib import Path
 
 try:
-    from constants import MANIFEST_FILE, VCPKG_MANIFEST_FILE
+    from constants import (
+        MANIFEST_FILE, VCPKG_MANIFEST_FILE, CMAKE_DEPENDENCY_MAPPING,
+        CMAKE_FIND_END_MARKER, CMAKE_FIND_START_MARKER,
+        CMAKE_LINK_END_MARKER, CMAKE_LINK_START_MARKER
+    )
 except ModuleNotFoundError:
-    from relay.constants import MANIFEST_FILE, VCPKG_MANIFEST_FILE
-except Exception:
-    pass
-
+    from relay.constants import (
+        MANIFEST_FILE, VCPKG_MANIFEST_FILE, CMAKE_DEPENDENCY_MAPPING,
+        CMAKE_FIND_END_MARKER, CMAKE_FIND_START_MARKER,
+        CMAKE_LINK_END_MARKER, CMAKE_LINK_START_MARKER
+    )
 
 def find_project_root(verbose):
     current_dir = Path.cwd()
     for parent in [current_dir] + list(current_dir.parents):
-        mainfest_path = parent / MANIFEST_FILE
+        manifest_path = parent / MANIFEST_FILE
         cmakelists_path = parent / "CMakeLists.txt"
-        if mainfest_path.exists() and cmakelists_path.exists():
+        if manifest_path.exists() and cmakelists_path.exists():
             verbose and print(f"Found project root: {parent}")
             return parent
     print(f"Error: Could not find project root. '{MANIFEST_FILE}' and 'CMakeLists.txt' not found in current directory or any parent directory.", file=sys.stderr)
@@ -38,6 +44,7 @@ def find_vcpkg_root(verbose):
         print(f"Warning: VCPKG_ROOT environment variable is set to '{vcpkg_root}', but a valid vcpkg.cmake was not found in expected locations.", file=sys.stderr)
     print("Error: VCPKG_ROOT environment variable not set or invalid.", file=sys.stderr)
     print("Please set the VCPKG_ROOT environment variable to your vcpkg installation path (usually the Git clone directory).", file=sys.stderr)
+    sys.exit(1) # Exit if VCPKG_ROOT is not found or invalid
 
 def get_vcpkg_triplet(toolchain_arg, verbose):
     if toolchain_arg:
@@ -47,18 +54,18 @@ def get_vcpkg_triplet(toolchain_arg, verbose):
         if default_triplet:
             verbose and print(f"Using VCPKG_DEFAULT_TRIPLET environment variable: {default_triplet}")
             return default_triplet.lower()
+    
     print("Warning: No --toolchain specified and VCPKG_DEFAULT_TRIPLET is not set.", file=sys.stderr)
-    import platform
-    system = platform.system() # Windows, Linux, Darwin
-    machine = platform.machine() # x86_64, aarch64, AMD64
+    system = platform.system()
+    machine = platform.machine()
 
     guessed_triplet = None
     if system == "Windows":
         guessed_triplet = "x64-windows" if machine in ('AMD64', 'x86_64') else "x86-windows"
     elif system == "Linux":
-        guessed_triplet = "x64-linux" if machine in ('x86_64',) else f"{machine}-linux" # rudimentary guess
-    elif system == "Darwin": # macOS
-        guessed_triplet = "x64-osx" if machine in ('x86_64',) else f"{machine}-osx" # rudimentary guess
+        guessed_triplet = "x64-linux" if machine in ('x86_64',) else f"{machine}-linux"
+    elif system == "Darwin":
+        guessed_triplet = "x64-osx" if machine in ('x86_64',) else f"{machine}-osx"
     else:
         print(f"Error: Cannot guess default triplet for unknown system '{system}'. Please specify --toolchain or set VCPKG_DEFAULT_TRIPLET.", file=sys.stderr)
         sys.exit(1)
@@ -94,10 +101,10 @@ def generate_vcpkg_json(project_root, build_dir, verbose):
         print(f"Warning: 'dependencies' section in {MANIFEST_FILE} is not a dictionary. Skipping dependency translation.", file=sys.stderr)
         dependencies = {}
     for name, details in dependencies.items():
-        dep_entry = {"name": name.lower()} # vcpkg names are lowercase
+        dep_entry = {"name": name.lower()}
         if isinstance(details, dict) and "features" in details:
              if isinstance(details["features"], list):
-                 dep_entry["features"] = [f.lower() for f in details["features"]] # vcpkg features lowercase
+                 dep_entry["features"] = [f.lower() for f in details["features"]]
              else:
                  print(f"Warning: Features for dependency '{name}' in {MANIFEST_FILE} is not a list. Skipping features.", file=sys.stderr)
 
@@ -133,9 +140,8 @@ def generate_vcpkg_json_from_relay_toml(project_root: Path):
     for dep_name, dep_version in dependencies.items():
         vcpkg_dependencies_list.append(dep_name)
 
-    # Basic vcpkg.json structure
     vcpkg_json_content = {
-        "dependencies": sorted(vcpkg_dependencies_list) # Sort for consistent file output
+        "dependencies": sorted(vcpkg_dependencies_list)
     }
     
     if vcpkg_json_path.exists():
@@ -157,4 +163,109 @@ def generate_vcpkg_json_from_relay_toml(project_root: Path):
         return True
     except IOError as e:
         print(f"Error writing to {VCPKG_MANIFEST_FILE}: {e}")
+        return False
+
+def update_cmake_lists_txt(project_root: Path):
+    cmake_lists_path = project_root / "CMakeLists.txt"
+    relay_toml_path = project_root / MANIFEST_FILE
+
+    if not cmake_lists_path.exists():
+        print(f"Error: CMakeLists.txt not found at {cmake_lists_path}. Cannot update.")
+        return False
+    if not relay_toml_path.exists():
+        print(f"Error: {MANIFEST_FILE} not found at {relay_toml_path}. Cannot update CMakeLists.txt.")
+        return False
+
+    try:
+        with open(relay_toml_path, 'r') as f:
+            relay_config = toml.load(f)
+    except (FileNotFoundError, toml.TomlDecodeError) as e:
+        print(f"Error reading {MANIFEST_FILE} for CMake update: {e}")
+        return False
+    project_name = relay_config.get("project", {}).get("name")
+    if not project_name:
+        print(f"Error: 'project.name' not found in {MANIFEST_FILE}. Cannot update CMakeLists.txt.")
+        return False
+
+    dependencies = relay_config.get("dependencies", {})
+
+    find_package_lines = []
+    target_link_lines = []
+    for dep_name in dependencies.keys():
+        mapping = CMAKE_DEPENDENCY_MAPPING.get(dep_name)
+        if mapping:
+            find_package_lines.append(mapping["find_package"])
+            target_link_lines.append(mapping["target_link"])
+        else:
+            print(f"Warning: No CMake mapping found for dependency '{dep_name}'. "
+                  f"Please add it to CMAKE_DEPENDENCY_MAPPING in constants.py if needed, "
+                  f"or handle it manually in CMakeLists.txt.")
+
+    find_package_lines.sort()
+    target_link_lines.sort()
+
+    if target_link_lines:
+        combined_target_link_line = f"target_link_libraries({project_name} PRIVATE " + " ".join(target_link_lines) + ")"
+    else:
+        combined_target_link_line = ""
+
+    try:
+        with open(cmake_lists_path, 'r') as f:
+            lines = f.readlines()
+    except IOError as e:
+        print(f"Error reading CMakeLists.txt at {cmake_lists_path}: {e}")
+        return False
+
+    new_lines = []
+    in_find_section = False
+    in_link_section = False
+    find_marker_found = False
+    link_marker_found = False
+
+    for line in lines:
+        if CMAKE_FIND_START_MARKER in line:
+            find_marker_found = True
+            new_lines.append(line)
+            in_find_section = True
+            for fp_line in find_package_lines:
+                new_lines.append(f"  {fp_line}\n")
+            continue
+
+        if CMAKE_FIND_END_MARKER in line:
+            new_lines.append(line)
+            in_find_section = False
+            continue
+
+        if CMAKE_LINK_START_MARKER in line:
+            link_marker_found = True
+            new_lines.append(line)
+            in_link_section = True
+            if combined_target_link_line:
+                new_lines.append(f"  {combined_target_link_line}\n")
+            continue
+
+        if CMAKE_LINK_END_MARKER in line:
+            new_lines.append(line)
+            in_link_section = False
+            continue
+
+        if in_find_section or in_link_section:
+            continue
+
+        new_lines.append(line)
+
+    if not find_marker_found:
+        print(f"Warning: {CMAKE_FIND_START_MARKER} and {CMAKE_FIND_END_MARKER} not found in CMakeLists.txt.")
+        print("Please add these markers to your CMakeLists.txt for automatic dependency discovery.")
+    if not link_marker_found:
+        print(f"Warning: {CMAKE_LINK_START_MARKER} and {CMAKE_LINK_END_MARKER} not found in CMakeLists.txt.")
+        print("Please add these markers to your CMakeLists.txt for automatic dependency linking.")
+
+    try:
+        with open(cmake_lists_path, 'w') as f:
+            f.writelines(new_lines)
+        print(f"Successfully updated CMakeLists.txt at {cmake_lists_path}.")
+        return True
+    except IOError as e:
+        print(f"Error writing to CMakeLists.txt: {e}")
         return False
